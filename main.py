@@ -7,6 +7,7 @@ from livereload import Server
 import sys
 from distutils.dir_util import copy_tree
 import shutil
+from datetime import datetime
 import config
 
 env = Environment(
@@ -37,7 +38,7 @@ def deduplicate_tags(tags):
 def paginate(items, page_size):
     return [items[i:i + page_size] for i in range(0, len(items), page_size)]
 
-def get_post_contents():
+def get_posts():
     post_folders = [d for d in os.listdir('content') if os.path.isdir('content/' + d)]
 
     posts = []
@@ -49,7 +50,12 @@ def get_post_contents():
         post = wrap_post(content=html, url=url, slug=slug, meta=html.metadata)
         posts.append(post)
 
-    return posts
+    def convert_date(post):
+        if post.get('date'):
+            return datetime.strptime(post.get('date'), '%Y-%m-%d')
+        return None
+
+    return sorted(posts, key=convert_date)
 
 def make_post_pages(posts):
     global env
@@ -173,7 +179,7 @@ def run():
     os.makedirs("output", exist_ok=True)
     copy_tree("templates/static", "output/static")
 
-    posts = get_post_contents()
+    posts = get_posts()
     tags = get_tags(posts)
 
     make_post_pages(posts)

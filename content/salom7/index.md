@@ -1,6 +1,6 @@
 ---
 title: Salom bolalar7
-date: 12321323
+date: 2019-12-01
 summary: Salom bolalar qalaysizlar?
 tags: pishloq, eshik
 ---
