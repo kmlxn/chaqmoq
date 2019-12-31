@@ -14,24 +14,22 @@ env = Environment(
     autoescape=select_autoescape(['html', 'xml'])
 )
 
-class Post:
-    def __init__(self, content, url, slug, meta):
-        self.content = content
-        self.url = url
-        self.slug = slug
-        self.date = meta.get('date')
-        self.title = meta.get('title') or 'Untitled'
-        self.summary = meta.get('summary')
-        if meta.get('tags'):
-            self.tags = [
-                {
-                    'title': tag.strip(),
-                    'slug': slugify(tag.strip()),
-                    'url': '/tags/' + slugify(tag.strip())
-                } for tag in meta['tags'].split(',')
-            ]
-        else:
-            self.tags = []
+def wrap_post(content, url, slug, meta):
+    return {
+        'content': content,
+        'url': url,
+        'slug': slug,
+        'date': meta.get('date'),
+        'title': meta.get('title', 'Untitled'),
+        'summary': meta.get('summary'),
+        'tags': [
+            {
+                'title': tag.strip(),
+                'slug': slugify(tag.strip()),
+                'url': '/tags/' + slugify(tag.strip())
+            } for tag in meta['tags'].split(',')
+        ] if meta.get('tags') else []
+    }
 
 def deduplicate_tags(tags):
     return list(unique_everseen(tags, lambda tag: tag['slug']))
@@ -48,7 +46,7 @@ def get_post_contents():
         html = markdown2.markdown_path(src_post_path, extras=["metadata"])
         url = '/' + post_folder
         slug = post_folder
-        post = Post(html, url, slug, html.metadata)
+        post = wrap_post(content=html, url=url, slug=slug, meta=html.metadata)
         posts.append(post)
 
     return posts
@@ -57,7 +55,7 @@ def make_post_pages(posts):
     global env
     template = env.get_template('post.html')
 
-    # copy other files
+    # copy other files (like images)
     post_folders = [d for d in os.listdir('content') if os.path.isdir('content/' + d)]
     for post_folder in post_folders:
         os.makedirs(os.path.join("output", post_folder), exist_ok=True)
@@ -67,16 +65,17 @@ def make_post_pages(posts):
         for file in files_to_copy:
             shutil.copy2(os.path.join(post_dir_path, file), os.path.join('output', post_folder))
 
+    # make post pages
     for post in posts:
-        os.makedirs(os.path.join('output', post.slug), exist_ok=True)
-        with open(os.path.join('output', post.slug, 'index.html'), 'w') as f:
+        os.makedirs(os.path.join('output', post['slug']), exist_ok=True)
+        with open(os.path.join('output', post['slug'], 'index.html'), 'w') as f:
             page = template.render(post=post, site_title=config.SITE_TITLE)
             f.write(page)
 
     return posts
 
 def get_tags(posts):
-    tags_from_posts = [tag for post in posts for tag in post.tags]
+    tags_from_posts = [tag for post in posts for tag in post['tags']]
     tags = deduplicate_tags(tags_from_posts)
 
     return tags
@@ -136,7 +135,10 @@ def make_tag_pages(posts, tags):
     template = env.get_template('tag.html')
 
     for tag in tags:
-        posts_for_tag = [post for post in posts if next(filter(lambda t: t['slug'] == tag['slug'], post.tags), None)]
+        is_needed_tag = lambda t: t['slug'] == tag['slug']
+        posts_for_tag = [
+            post for post in posts if list(filter(is_needed_tag, post['tags']))
+        ]
 
         if config.POSTS_PER_PAGE:
             pages = paginate(posts_for_tag, config.POSTS_PER_PAGE)
