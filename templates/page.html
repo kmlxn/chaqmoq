@@ -8,7 +8,7 @@
 {% endblock %}
 
 {% block main %}
-  <div class="page-content">
+  <div class="content">
     {{ page.content|safe }}
   </div>
   <ul class="tags">
@@ -17,3 +17,5 @@
     {% endfor %}
   </ul>
 {% endblock %}
+
+{% block image %}{% if page.image %}{{ page.image }}{% else %}/static/img/home-bg.jpg{% endif %}{% endblock %}

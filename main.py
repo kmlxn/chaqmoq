@@ -25,6 +25,7 @@ def wrap_page(content, url, slug, meta):
         'title': meta.get('title', 'Untitled'),
         'summary': meta.get('summary'),
         'order': int(meta.get('order')) if meta.get('order') else 0,
+        'image': meta.get('image'),
     }
 
 
@@ -36,6 +37,7 @@ def wrap_post(content, url, slug, meta):
         'date': meta.get('date'),
         'title': meta.get('title', 'Untitled'),
         'summary': meta.get('summary'),
+        'image': meta.get('image'),
         'tags': [
             {
                 'title': tag.strip(),
