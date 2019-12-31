@@ -13,7 +13,7 @@ import config
 
 env = Environment(
     loader=PackageLoader(__name__, 'templates'),
-    autoescape=select_autoescape(['html', 'xml'])
+    autoescape=select_autoescape(['html', 'xml']),
 )
 
 
