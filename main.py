@@ -153,6 +153,7 @@ def make_pages_html(pages):
         with open(os.path.join('output', page['slug'], 'index.html'), 'w') as f:
             page = template.render(
                 page=page,
+                pages=pages,
                 meta_description=config.META_DESCRIPTION,
                 site_title=config.SITE_TITLE,
             )
