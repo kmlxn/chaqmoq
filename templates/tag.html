@@ -38,21 +38,17 @@
           <li class="nav-item">
             <a class="nav-link" href="/">Home</a>
           </li>
-          <li class="nav-item">
-            <a class="nav-link" href="about.html">About</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="post.html">Sample Post</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="contact.html">Contact</a>
-          </li>
+            {% for page in pages %}
+            <li class="nav-item">
+              <a class="nav-link" href="{{ page.url }}">{{ page.title }}</a>
+            </li>
+            {% endfor %}
         </ul>
       </div>
     </div>
   </nav>
 
-  <!-- Page Header -->
+  <!-- group Header -->
   <header class="masthead" style="background-image: url('/static/img/home-bg.jpg')">
     <div class="overlay"></div>
     <div class="container">
@@ -92,12 +88,12 @@
         <hr>
         {% endfor %}
         <ul class="pagination">
-            {% if prev_page %}
+            {% if prev_group %}
                 <li>
-                    <a href="{{ prev_page.url }}"><i class="fas fa-arrow-left"></i></a>
+                    <a href="{{ prev_group.url }}"><i class="fas fa-arrow-left"></i></a>
                 </li>
             {% endif %}
-            {% for p in pages %}
+            {% for p in pagination %}
                 <li class="{% if p.active %} active {% endif %}">
                     <a  
                         href="{{ p.url }}"
@@ -106,9 +102,9 @@
                     </a>
                 </li>
             {% endfor %}
-            {% if next_page %}
+            {% if next_group %}
                 <li>
-                    <a href="{{ next_page.url }}"><i class="fas fa-arrow-right"></i></a>
+                    <a href="{{ next_group.url }}"><i class="fas fa-arrow-right"></i></a>
                 </li>
             {% endif %}
         </ul>

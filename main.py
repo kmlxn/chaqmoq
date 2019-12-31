@@ -10,10 +10,22 @@ import shutil
 from datetime import datetime
 import config
 
+
 env = Environment(
     loader=PackageLoader(__name__, 'templates'),
     autoescape=select_autoescape(['html', 'xml'])
 )
+
+
+def wrap_page(content, url, slug, meta):
+    return {
+        'content': content,
+        'url': url,
+        'slug': slug,
+        'title': meta.get('title', 'Untitled'),
+        'order': int(meta.get('order')) if meta.get('order') else 0,
+    }
+
 
 def wrap_post(content, url, slug, meta):
     return {
@@ -32,53 +44,114 @@ def wrap_post(content, url, slug, meta):
         ] if meta.get('tags') else []
     }
 
+
 def deduplicate_tags(tags):
     return list(unique_everseen(tags, lambda tag: tag['slug']))
 
-def paginate(items, page_size):
+
+def group_by(items, page_size):
     return [items[i:i + page_size] for i in range(0, len(items), page_size)]
 
+
 def get_posts():
-    post_folders = [d for d in os.listdir('content') if os.path.isdir('content/' + d)]
+    path = 'content/posts'
+    post_folders = [d for d in os.listdir(path) if os.path.isdir(os.path.join(path, d))]
 
     posts = []
     for post_folder in post_folders:
-        src_post_path = os.path.join('content', post_folder, 'index.md')
+        src_post_path = os.path.join(path, post_folder, 'index.md')
         html = markdown2.markdown_path(src_post_path, extras=["metadata"])
-        url = '/' + post_folder
-        slug = post_folder
-        post = wrap_post(content=html, url=url, slug=slug, meta=html.metadata)
+        post = wrap_post(
+            content=html,
+            url='/' + post_folder,
+            slug=post_folder,
+            meta=html.metadata
+        )
         posts.append(post)
 
-    def convert_date(post):
-        if post.get('date'):
-            return datetime.strptime(post.get('date'), '%Y-%m-%d')
-        return None
+    get_date = lambda post: post['date'] or datetime.strptime(post['date'], '%Y-%m-%d')
+    
+    return sorted(posts, key=get_date)
 
-    return sorted(posts, key=convert_date)
 
-def make_post_pages(posts):
+def get_pages():
+    path = 'content/pages'
+    page_folders = [d for d in os.listdir(path) if os.path.isdir(os.path.join(path, d))]
+
+    pages = []
+    for page_folder in page_folders:
+        src_page_path = os.path.join(path, page_folder, 'index.md')
+        html = markdown2.markdown_path(src_page_path, extras=["metadata"])
+        page = wrap_page(
+            content=html,
+            url='/' + page_folder,
+            slug=page_folder,
+            meta=html.metadata
+        )
+        pages.append(page)
+
+    return sorted(pages, key=lambda p: p['order'])
+
+
+def make_posts_html(posts, pages):
     global env
     template = env.get_template('post.html')
 
-    # copy other files (like images)
-    post_folders = [d for d in os.listdir('content') if os.path.isdir('content/' + d)]
+    post_folders = [d for d in os.listdir('content/posts')
+        if os.path.isdir(os.path.join('content/posts', d))]
+
     for post_folder in post_folders:
         os.makedirs(os.path.join("output", post_folder), exist_ok=True)
-        post_dir_path = os.path.join("content", post_folder)
+        post_dir_path = os.path.join("content/posts", post_folder)
         post_files = os.listdir(post_dir_path)
         files_to_copy = [file for file in post_files if file != 'index.md']
-        for file in files_to_copy:
-            shutil.copy2(os.path.join(post_dir_path, file), os.path.join('output', post_folder))
 
-    # make post pages
+        for file in files_to_copy:
+            shutil.copy2(
+                os.path.join(post_dir_path, file),
+                os.path.join('output', post_folder)
+            )
+
     for post in posts:
         os.makedirs(os.path.join('output', post['slug']), exist_ok=True)
         with open(os.path.join('output', post['slug'], 'index.html'), 'w') as f:
-            page = template.render(post=post, site_title=config.SITE_TITLE)
+            page = template.render(
+                post=post,
+                site_title=config.SITE_TITLE,
+                pages=pages
+                )
             f.write(page)
 
     return posts
+
+
+def make_pages_html(pages):
+    global env
+    template = env.get_template('page.html')
+
+    page_folders = [d for d in os.listdir('content/pages')
+        if os.path.isdir(os.path.join('content/pages', d))]
+
+    for page_folder in page_folders:
+        os.makedirs(os.path.join("output", page_folder), exist_ok=True)
+        page_dir_path = os.path.join("content/pages", page_folder)
+        page_files = os.listdir(page_dir_path)
+        files_to_copy = [file for file in page_files if file != 'index.md']
+
+        for file in files_to_copy:
+            shutil.copy2(
+                os.path.join(page_dir_path, file),
+                os.path.join('output', page_folder)
+            )
+
+    for page in pages:
+        os.makedirs(os.path.join('output', page['slug']), exist_ok=True)
+        with open(os.path.join('output', page['slug'], 'index.html'), 'w') as f:
+            page = template.render(page=page, site_title=config.SITE_TITLE)
+            f.write(page)
+
+    return pages
+
 
 def get_tags(posts):
     tags_from_posts = [tag for post in posts for tag in post['tags']]
@@ -86,57 +159,58 @@ def get_tags(posts):
 
     return tags
 
-def make_pagination(pages, page_index, url_prefix = '/'):
+
+def make_pagination(groups, group_index, url_prefix = '/'):
     pagination = [
         {
             'number': index + 1,
             'url': url_prefix + str(index + 1 if index > 0 else ''),
-            'active': index == page_index,
+            'active': index == group_index,
         }
-        for index, _ in enumerate(pages)
-    ] if len(pages) > 1 else []
+        for index, _ in enumerate(groups)
+    ] if len(groups) > 1 else []
     
 
-    page = pagination[page_index] if pagination else {}
     pagination = pagination
-    next_page = pagination[page_index + 1] if page_index < len(pagination) - 1 else {}
-    prev_page = pagination[page_index - 1] if pagination and page_index > 0 else {}
+    next_group = pagination[group_index + 1] if group_index < len(pagination) - 1 else {}
+    prev_group = pagination[group_index - 1] if pagination and group_index > 0 else {}
 
     return {
-        'page': page,
-        'pages': pagination,
-        'next_page': next_page,
-        'prev_page': prev_page,
+        'pagination': pagination,
+        'next_group': next_group,
+        'prev_group': prev_group,
     }
 
-def make_index_pages(posts, tags):
+
+def make_index_html(posts, pages, tags):
     global env
     template = env.get_template('index.html')
 
     if config.POSTS_PER_PAGE:
-        pages = paginate(posts, config.POSTS_PER_PAGE)
+        grouped_posts = group_by(posts, config.POSTS_PER_PAGE)
     else:
-        pages = [posts]
+        grouped_posts = [posts]
 
-    for page_index, page in enumerate(pages):
+    for group_index, group in enumerate(grouped_posts):
         index_page = template.render(
-            posts=page,
+            posts=group,
             tags=tags,
             site_title=config.SITE_TITLE,
-            **make_pagination(pages, page_index)
+            pages=pages,
+            **make_pagination(grouped_posts, group_index)
         )
 
-        if page_index == 0:
+        if group_index == 0:
             path = 'output/index.html'
         else:
-            os.makedirs(f'output/{page_index + 1}', exist_ok=True)
-            path = f'output/{page_index + 1}/index.html'
+            os.makedirs(f'output/{group_index + 1}', exist_ok=True)
+            path = f'output/{group_index + 1}/index.html'
 
         with open(path, 'w') as f:
             f.write(index_page)
 
 
-def make_tag_pages(posts, tags):
+def make_tag_html(posts, tags, pages):
     global env
     template = env.get_template('tag.html')
 
@@ -147,17 +221,18 @@ def make_tag_pages(posts, tags):
         ]
 
         if config.POSTS_PER_PAGE:
-            pages = paginate(posts_for_tag, config.POSTS_PER_PAGE)
+            groups = group_by(posts_for_tag, config.POSTS_PER_PAGE)
         else:
-            pages = [posts_for_tag]
+            groups = [posts_for_tag]
         
-        for page_index, page in enumerate(pages):
+        for page_index, page in enumerate(groups):
             index_page = template.render(
                 tag=tag,
                 posts=page,
                 tags=tags,
+                pages=pages,
                 site_title=config.SITE_TITLE,
-                **make_pagination(pages, page_index, tag['url'] + '/'),
+                **make_pagination(groups, page_index, tag['url'] + '/'),
             )
 
             if page_index == 0:
@@ -170,6 +245,7 @@ def make_tag_pages(posts, tags):
             with open(path, 'w') as f:
                 f.write(index_page)
 
+
 def run():
     try:
         shutil.rmtree('output')
@@ -180,11 +256,14 @@ def run():
     copy_tree("templates/static", "output/static")
 
     posts = get_posts()
+    pages = get_pages()
     tags = get_tags(posts)
 
-    make_post_pages(posts)
-    make_index_pages(posts, tags)
-    make_tag_pages(posts, tags)
+    make_posts_html(posts, pages)
+    make_pages_html(pages)
+    make_tag_html(posts, tags, pages)
+    make_index_html(posts, pages, tags)
+
 
 if __name__ == "__main__":
     run()
