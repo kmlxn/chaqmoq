@@ -23,6 +23,7 @@ def wrap_page(content, url, slug, meta):
         'url': url,
         'slug': slug,
         'title': meta.get('title', 'Untitled'),
+        'summary': meta.get('summary'),
         'order': int(meta.get('order')) if meta.get('order') else 0,
     }
 
@@ -117,6 +118,7 @@ def make_posts_html(posts, pages):
         with open(os.path.join('output', post['slug'], 'index.html'), 'w') as f:
             page = template.render(
                 post=post,
+                meta_description=config.META_DESCRIPTION,
                 site_title=config.SITE_TITLE,
                 pages=pages
                 )
@@ -147,7 +149,11 @@ def make_pages_html(pages):
     for page in pages:
         os.makedirs(os.path.join('output', page['slug']), exist_ok=True)
         with open(os.path.join('output', page['slug'], 'index.html'), 'w') as f:
-            page = template.render(page=page, site_title=config.SITE_TITLE)
+            page = template.render(
+                page=page,
+                meta_description=config.META_DESCRIPTION,
+                site_title=config.SITE_TITLE,
+            )
             f.write(page)
 
     return pages
@@ -195,7 +201,9 @@ def make_index_html(posts, pages, tags):
         index_page = template.render(
             posts=group,
             tags=tags,
+            meta_description=config.META_DESCRIPTION,
             site_title=config.SITE_TITLE,
+            site_subtitle=config.SITE_SUBTITLE,
             pages=pages,
             **make_pagination(grouped_posts, group_index)
         )
@@ -231,6 +239,7 @@ def make_tag_html(posts, tags, pages):
                 posts=page,
                 tags=tags,
                 pages=pages,
+                meta_description=config.META_DESCRIPTION,
                 site_title=config.SITE_TITLE,
                 **make_pagination(groups, page_index, tag['url'] + '/'),
             )
