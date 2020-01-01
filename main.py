@@ -3,11 +3,22 @@ from jinja2 import Environment, PackageLoader, select_autoescape
 from slugify import slugify
 from iteration_utilities import unique_everseen
 import os
+from os.path import join
 from livereload import Server
 import sys
 import shutil
 from datetime import datetime
 import config
+
+
+def abs_path(path):
+    package_dir = os.path.dirname(os.path.abspath(__file__))
+    return join(package_dir, path)
+
+all_pages_folder = abs_path('content/pages')
+all_posts_folder = abs_path('content/posts')
+output_folder = abs_path('output')
+tags_output_folder = abs_path('output/tags')
 
 
 env = Environment(
@@ -56,17 +67,19 @@ def group_by(items, page_size):
 
 
 def get_posts():
-    path = 'content/posts'
-    post_folders = [d for d in os.listdir(path) if os.path.isdir(os.path.join(path, d))]
+    global all_posts_folder
+
+    post_folder_names = [d for d in os.listdir(all_posts_folder)
+        if os.path.isdir(join(all_posts_folder, d))]
 
     posts = []
-    for post_folder in post_folders:
-        src_post_path = os.path.join(path, post_folder, 'index.md')
+    for post_folder_name in post_folder_names:
+        src_post_path = join(all_posts_folder, post_folder_name, 'index.md')
         html = markdown2.markdown_path(src_post_path, extras=["metadata"])
         post = wrap_post(
             content=html,
-            url='/' + post_folder,
-            slug=post_folder,
+            url='/' + post_folder_name,
+            slug=post_folder_name,
             meta=html.metadata
         )
         posts.append(post)
@@ -77,17 +90,19 @@ def get_posts():
 
 
 def get_pages():
-    path = 'content/pages'
-    page_folders = [d for d in os.listdir(path) if os.path.isdir(os.path.join(path, d))]
+    global all_pages_folder
+
+    page_folder_names = [d for d in os.listdir(all_pages_folder)
+        if os.path.isdir(join(all_pages_folder, d))]
 
     pages = []
-    for page_folder in page_folders:
-        src_page_path = os.path.join(path, page_folder, 'index.md')
-        html = markdown2.markdown_path(src_page_path, extras=["metadata"])
+    for page_folder_name in page_folder_names:
+        page_path = join(all_pages_folder, page_folder_name, 'index.md')
+        html = markdown2.markdown_path(page_path, extras=["metadata"])
         page = wrap_page(
             content=html,
-            url='/' + page_folder,
-            slug=page_folder,
+            url='/' + page_folder_name,
+            slug=page_folder_name,
             meta=html.metadata
         )
         pages.append(page)
@@ -96,60 +111,59 @@ def get_pages():
 
 
 def make_posts_html(posts, pages):
-    global env
+    global env, all_posts_folder, output_folder
     template = env.get_template('post.html')
+    
+    post_folder_names = [d for d in os.listdir(all_posts_folder)
+        if os.path.isdir(join(all_posts_folder, d))]
 
-    post_folders = [d for d in os.listdir('content/posts')
-        if os.path.isdir(os.path.join('content/posts', d))]
-
-    for post_folder in post_folders:
-        os.makedirs(os.path.join("output", post_folder), exist_ok=True)
-        post_dir_path = os.path.join("content/posts", post_folder)
-        post_files = os.listdir(post_dir_path)
+    for post_folder_name in post_folder_names:
+        generated_folder = join(output_folder, post_folder_name)
+        os.makedirs(generated_folder, exist_ok=True)
+        post_folder = join(all_posts_folder, post_folder_name)
+        post_files = os.listdir(post_folder)
         files_to_copy = [file for file in post_files if file != 'index.md']
 
         for file in files_to_copy:
             shutil.copy2(
-                os.path.join(post_dir_path, file),
-                os.path.join('output', post_folder)
+                join(post_folder, file),
+                generated_folder
             )
 
     for post in posts:
-        os.makedirs(os.path.join('output', post['slug']), exist_ok=True)
-        with open(os.path.join('output', post['slug'], 'index.html'), 'w') as f:
+        with open(join(output_folder, post['slug'], 'index.html'), 'w') as f:
             page = template.render(
                 post=post,
                 meta_description=config.META_DESCRIPTION,
                 site_title=config.SITE_TITLE,
-                pages=pages
-                )
+                pages=pages,
+            )
             f.write(page)
 
     return posts
 
 
 def make_pages_html(pages):
-    global env
+    global env, all_pages_folder, output_folder
     template = env.get_template('page.html')
 
-    page_folders = [d for d in os.listdir('content/pages')
-        if os.path.isdir(os.path.join('content/pages', d))]
+    page_folder_names = [d for d in os.listdir(all_pages_folder)
+        if os.path.isdir(join(all_pages_folder, d))]
 
-    for page_folder in page_folders:
-        os.makedirs(os.path.join("output", page_folder), exist_ok=True)
-        page_dir_path = os.path.join("content/pages", page_folder)
-        page_files = os.listdir(page_dir_path)
+    for page_folder_name in page_folder_names:
+        os.makedirs(join(output_folder, page_folder_name), exist_ok=True)
+        page_folder = join(all_pages_folder, page_folder_name)
+        page_files = os.listdir(page_folder)
         files_to_copy = [file for file in page_files if file != 'index.md']
 
         for file in files_to_copy:
             shutil.copy2(
-                os.path.join(page_dir_path, file),
-                os.path.join('output', page_folder)
+                join(page_folder, file),
+                join(output_folder, page_folder_name)
             )
 
     for page in pages:
-        os.makedirs(os.path.join('output', page['slug']), exist_ok=True)
-        with open(os.path.join('output', page['slug'], 'index.html'), 'w') as f:
+        with open(join(output_folder, page['slug'], 'index.html'), 'w') as f:
             page = template.render(
                 page=page,
                 pages=pages,
@@ -191,7 +205,7 @@ def make_pagination(groups, group_index, url_prefix = '/'):
 
 
 def make_index_html(posts, pages, tags):
-    global env
+    global env, output_folder
     template = env.get_template('index.html')
 
     if config.POSTS_PER_PAGE:
@@ -211,17 +225,17 @@ def make_index_html(posts, pages, tags):
         )
 
         if group_index == 0:
-            path = 'output/index.html'
+            path = join(output_folder, 'index.html')
         else:
-            os.makedirs(f'output/{group_index + 1}', exist_ok=True)
-            path = f'output/{group_index + 1}/index.html'
+            os.makedirs(join(output_folder, str(group_index + 1)), exist_ok=True)
+            path = join(output_folder, str(group_index + 1), 'index.html')
 
         with open(path, 'w') as f:
             f.write(index_page)
 
 
 def make_tag_html(posts, tags, pages):
-    global env
+    global env, output_folder
     template = env.get_template('tag.html')
 
     for tag in tags:
@@ -247,20 +261,24 @@ def make_tag_html(posts, tags, pages):
             )
 
             if page_index == 0:
-                os.makedirs(f'output/tags/{tag["slug"]}', exist_ok=True)
-                path = f'output/tags/{tag["slug"]}/index.html'
+                os.makedirs(join(tags_output_folder, tag['slug']), exist_ok=True)
+                path = join(tags_output_folder, tag['slug'], 'index.html')
             else:
-                os.makedirs(f'output/tags/{tag["slug"]}/{page_index + 1}', exist_ok=True)
-                path = f'output/tags/{tag["slug"]}/{page_index + 1}/index.html'
+                os.makedirs(join(tags_output_folder, tag['slug'], str(page_index + 1)), exist_ok=True)
+                path = join(tags_output_folder, tag['slug'], str(page_index + 1), 'index.html')
 
             with open(path, 'w') as f:
                 f.write(index_page)
 
 
 def run():
-    os.makedirs('content/pages', exist_ok=True)
-    os.makedirs('content/posts', exist_ok=True)
-    shutil.copytree("templates/static", "output/static", dirs_exist_ok=True)
+    os.makedirs(all_pages_folder, exist_ok=True)
+    os.makedirs(all_posts_folder, exist_ok=True)
+    shutil.copytree(
+        abs_path('templates/static'),
+        abs_path('output/static'),
+        dirs_exist_ok=True
+    )
 
     posts = get_posts()
     pages = get_pages()
@@ -296,6 +314,6 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == 'serve':
         _init_livereload_patch()
         server = Server()
-        server.watch('content/pages/*/*', run)
-        server.watch('content/posts/*/*', run)
-        server.serve(root='output')
+        server.watch(join(all_pages_folder, '*/*'), run)
+        server.watch(join(all_posts_folder, '*/*'), run)
+        server.serve(root=output_folder)
