@@ -5,7 +5,6 @@ from iteration_utilities import unique_everseen
 import os
 from livereload import Server
 import sys
-from distutils.dir_util import copy_tree
 import shutil
 from datetime import datetime
 import config
@@ -259,13 +258,9 @@ def make_tag_html(posts, tags, pages):
 
 
 def run():
-    try:
-        shutil.rmtree('output')
-    except FileNotFoundError:
-        pass
-
-    os.makedirs("output", exist_ok=True)
-    copy_tree("templates/static", "output/static")
+    os.makedirs('content/pages', exist_ok=True)
+    os.makedirs('content/posts', exist_ok=True)
+    shutil.copytree("templates/static", "output/static", dirs_exist_ok=True)
 
     posts = get_posts()
     pages = get_pages()
@@ -277,9 +272,30 @@ def run():
     make_index_html(posts, pages, tags)
 
 
+def _init_livereload_patch():
+    """
+    Select compatible event loop for Tornado 5+.
+     As of Python 3.8, the default event loop on Windows is `proactor`,
+    however Tornado requires the old default "selector" event loop.
+    As Tornado has decided to leave this to users to set, MkDocs needs
+    to set it. See https://github.com/tornadoweb/tornado/issues/2608.
+    """
+    if sys.platform.startswith("win") and sys.version_info >= (3, 8):
+        import asyncio
+        try:
+            from asyncio import WindowsSelectorEventLoopPolicy
+        except ImportError:
+            pass  # Can't assign a policy which doesn't exist.
+        else:
+            if not isinstance(asyncio.get_event_loop_policy(), WindowsSelectorEventLoopPolicy):
+                asyncio.set_event_loop_policy(WindowsSelectorEventLoopPolicy())
+
+
 if __name__ == "__main__":
     run()
     if len(sys.argv) > 1 and sys.argv[1] == 'serve':
+        _init_livereload_patch()
         server = Server()
-        server.watch('content/*.md', run)
+        server.watch('content/pages/*/*', run)
+        server.watch('content/posts/*/*', run)
         server.serve(root='output')
