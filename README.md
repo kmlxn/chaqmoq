@@ -1,7 +1,6 @@
 # Chaqmoq - simple static site generator written in Python 3
 
-## Steps
-
+0. `pip install -r requirements.txt`
 1. Add folders files inside `content/posts` folder. Inside each folder add `index.md`. These will be your blog posts. You can add image, tags, date published, title to your posts.
 2. Add folders files inside `content/pages` folder. Inside each folder add `index.md`. These will be your pages. You can add image, title to your pages.
 3. run `python main.py`
