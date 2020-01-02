@@ -271,6 +271,49 @@ def make_tag_html(posts, tags, pages):
                 f.write(index_page)
 
 
+def add_sample_post():
+    markdown = """---
+title: Sample post
+date: 2000-01-01
+summary: Nothing interesting in it
+tags: sample, post, sampletag
+---
+
+## Sample
+
+post *nothing*
+
+interesting **in it**.
+
+> salom
+    """
+    print('You have no posts. Adding sample post.')
+    os.makedirs(abs_path('content/posts/samplepost'), exist_ok=True)
+    with open(abs_path('content/posts/samplepost/index.md'), 'w') as f:
+        f.write(markdown)
+
+
+def add_sample_page():
+    markdown = """---
+title: Sample page
+order: 1
+summary: Nothing interesting in it
+---
+
+## Sample
+
+page *nothing*
+
+interesting **in it**.
+
+> salom
+    """
+    print('You have no pages. Adding sample page.')
+    os.makedirs(abs_path('content/pages/samplepage'), exist_ok=True)
+    with open(abs_path('content/pages/samplepage/index.md'), 'w') as f:
+        f.write(markdown)
+
+
 def run():
     os.makedirs(all_pages_folder, exist_ok=True)
     os.makedirs(all_posts_folder, exist_ok=True)
@@ -281,7 +324,15 @@ def run():
     )
 
     posts = get_posts()
+    if not posts:
+        add_sample_post()
+        posts = get_posts()
+
     pages = get_pages()
+    if not pages:
+        add_sample_page()
+        pages = get_pages()
+
     tags = get_tags(posts)
 
     make_posts_html(posts, pages)
